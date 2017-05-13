@@ -26,9 +26,14 @@ namespace CrudPersonaSp.Dao
         {
             try
             {
+                if(Existe(persona.idPersona))
+                {
+                    return "El id de usuario ya esta registrado, ingrese otro id";
+                }
+
                 varConexion.Conectar();
                 // le pasamos la variable de conexion a la transaccion
-               trx = varConexion.conn.BeginTransaction();
+                trx = varConexion.conn.BeginTransaction();
                 // le pasamos la variable de conexion al comando
                 cmd = new SqlCommand("Persona_Insert", varConexion.conn, trx);
                 cmd.CommandType = CommandType.StoredProcedure;
@@ -61,17 +66,133 @@ namespace CrudPersonaSp.Dao
 
         public string Eliminar(int idPersona)
         {
-            throw new NotImplementedException();
+
+            try
+            {
+                if(Existe(idPersona))
+                {
+                    //Abrimos la conexion
+                    varConexion.Conectar();
+                    //iniciamos la transaccion
+                    trx = varConexion.conn.BeginTransaction();
+                    //creamo el comando
+                    cmd = new SqlCommand("Persona_Delete", varConexion.conn, trx);
+                    cmd.CommandType = CommandType.StoredProcedure;
+                    //agregamos el parametro para eliminar
+                    cmd.Parameters.AddWithValue("@idPersona", idPersona);
+                    //obtenemoscon un int el numero de filas afectadas
+                    int rowAffected = cmd.ExecuteNonQuery();
+                    if(rowAffected==1)
+                    {
+                        //la fila ha sido eliminada
+                        trx.Commit();
+                        varConexion.Desconectar();
+                        return "Se ha eliminado un registro de la base de datos";
+                    }
+                    if(rowAffected>1)
+                    {
+                        trx.Rollback();
+                        varConexion.Desconectar();
+                        // se han eliminado mas de un registro, por lo que hacemos un rollback
+                        return "Error, se ha intentado eliminar mas de un registro, solo se debe eliminar uno a la vez";
+                    }
+                }
+                return "No existe el id a eliminar";
+            
+            }
+            catch
+            {
+                   trx.Rollback();
+                        varConexion.Desconectar();
+                return "Ha ocurrido un error al intentar eliminar el registro";
+
+            }
         }
 
         public string Actualizar(Personas persona)
         {
-            throw new NotImplementedException();
+            try
+            {
+                //abrimos la conexion
+                varConexion.Conectar();
+                //iniciamos la transaccion
+                trx = varConexion.conn.BeginTransaction();
+                //trx.Connection.ConnectionString = varConexion.strConexion;
+               // trx.Connection.BeginTransaction();
+                //creamos el comando
+                cmd = new SqlCommand("Persona_Update", varConexion.conn, trx);
+                cmd.CommandType = CommandType.StoredProcedure;
+                cmd.Parameters.AddWithValue("@idPersona", persona.idPersona);
+                cmd.Parameters.AddWithValue("@nombre", persona.nombre);
+                cmd.Parameters.AddWithValue("@direccion", persona.direccion);
+                cmd.Parameters.AddWithValue("@imagen", persona.imagen);
+                cmd.Parameters.AddWithValue("@nacimiento", persona.nacimiento);
+                cmd.Parameters.AddWithValue("@telefono", persona.telefono);
+                cmd.Parameters.AddWithValue("@email", persona.email);
+
+                //obtenermos el entero de retorno para ver si afecto a algunas filas
+                int rowsAffected = cmd.ExecuteNonQuery();
+                if(rowsAffected>0)
+                {
+                    trx.Commit();
+                    varConexion.Desconectar();
+                    return "Se ha actualizado " + rowsAffected + " registro de la base de datos";
+                   
+                }
+                trx.Rollback();
+                varConexion.Desconectar();
+                return "No se ha podido actualizar el registro";
+
+
+            }
+            catch
+            {
+                trx.Rollback();
+                varConexion.Desconectar();
+                return "Error, no se ha podidio Actualizar el registro";
+            }
         }
 
         public Personas BuscarId(int id)
         {
-            throw new NotImplementedException();
+            Personas p = new Personas();
+            try
+            {
+                //iniciamos la conexion
+                varConexion.Conectar();
+                //iniciamos el comando
+                cmd = new SqlCommand("Persona_Select", varConexion.conn);
+                //creamos los pararmetros que recibe el procedimiento almacenado
+                cmd.Parameters.Add("@idPersona", SqlDbType.Int).Value=id;
+                cmd.CommandType = CommandType.StoredProcedure;
+                dr= cmd.ExecuteReader();
+                
+                if(dr.HasRows)
+                {
+                     while (dr.Read())
+                     {
+                         p.idPersona = Convert.ToInt32(dr["idPersona"]);
+                         p.nombre = dr["nombre"].ToString();
+                         p.direccion = dr["direccion"].ToString();
+                         if(!String.IsNullOrEmpty(dr["imagen"].ToString()))
+                         {
+                             p.imagen = (byte[])dr["imagen"];
+                         }
+                         p.nacimiento = Convert.ToDateTime(dr["nacimiento"]);
+                         p.telefono= dr["telefono"].ToString();
+                         p.email = dr["email"].ToString();
+
+                     }
+                }
+                varConexion.Desconectar();
+                return p;
+
+            }
+            catch (Exception ex)
+            {
+                varConexion.Desconectar();
+                return p;
+            }
         }
 
         public Personas BuscarNombre(string nombre)
@@ -81,17 +202,103 @@ namespace CrudPersonaSp.Dao
 
         public List<Personas> Listar()
         {
-            throw new NotImplementedException();
+            List<Personas> lista = new List<Personas>();
+            try
+            {
+                //abrimos la conexion
+                varConexion.Conectar();
+                //agregamos el comando
+                cmd = new SqlCommand("Persona_Listar", varConexion.conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+
+                dr = cmd.ExecuteReader();
+
+                if (dr.HasRows)
+                {
+                    while(dr.Read())
+                    {
+                        Personas p = new Personas();
+                        p.idPersona = Convert.ToInt32(dr["idPersona"]);
+                        p.nombre = dr["nombre"].ToString();
+                        p.direccion = dr["direccion"].ToString();
+                        if (!String.IsNullOrEmpty(dr["imagen"].ToString()))
+                        {
+                            p.imagen = (byte[])dr["imagen"];
+                        }
+                        p.telefono = dr["telefono"].ToString();
+                        p.nacimiento = DateTime.Parse(dr["nacimiento"].ToString());
+                        p.email = dr["email"].ToString();
+
+                        lista.Add(p);
+                        
+                    }
+                    dr.NextResult();
+                }
+                return lista;
+            }
+            catch (Exception ex)
+            {
+                return null;
+            }
         }
 
         public bool Existe(int id)
         {
-            throw new NotImplementedException();
+           try
+           {
+               //abrimos la conexion
+               varConexion.Conectar();
+               //instanceamos el comando
+               cmd = new SqlCommand("Persona_Exists", varConexion.conn);
+               cmd.CommandType = CommandType.StoredProcedure;
+               //agregamos los parametros de entrada
+               cmd.Parameters.Add("@idPersona", SqlDbType.Int).Value = id;
+               //agregamos parametro de salida
+               
+               cmd.Parameters.Add("@exists", SqlDbType.Int).Direction =ParameterDirection.Output;
+               //ejecutamos el comando de consulta
+               cmd.ExecuteNonQuery();
+               varConexion.Desconectar();
+               int existe = Convert.ToInt32(cmd.Parameters["@exists"].Value.ToString());
+               if(existe==1)
+               {
+                   return true;
+               }
+               return false;
+           }
+            catch(Exception ex)
+           {
+               return false;
+           }
         }
 
         public int ObtenerId()
         {
-            throw new NotImplementedException();
+            try
+            {
+                //iniciamos la conexion
+                varConexion.Conectar();
+                //pasamos los datos al comando
+                cmd = new SqlCommand("select_max_id_persona", varConexion.conn);
+                cmd.CommandType = CommandType.StoredProcedure;
+                // creamos la variable de salida
+                cmd.Parameters.Add("@idPersona", SqlDbType.Int);
+                cmd.Parameters["@idPersona"].Direction = ParameterDirection.Output;
+
+                //creamos la variable de retorno por si queremos recuperar el retorno
+                cmd.Parameters.Add("@return_value", SqlDbType.Int);
+                cmd.Parameters["@return_value"].Direction = ParameterDirection.ReturnValue;
+
+                cmd.ExecuteNonQuery();
+                int idreturn = Convert.ToInt32(cmd.Parameters["@return_value"].Value);
+                int id = Convert.ToInt32(cmd.Parameters["@idPersona"].Value);
+                return id+1;
+
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }
